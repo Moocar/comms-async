@@ -158,7 +158,6 @@
         body-bytes [(.array buf) 
                     (+ (.arrayOffset buf) (.position buf))
                     (.remaining buf)]
-        _ (println "packet type" packet-type request-id request-ch)
         to-ch (if (= response-flag packet-type)
                 (get @response-chans-atom request-id)
                 request-ch)
@@ -176,11 +175,11 @@
   ([send-xf]
    (let [request-id-seq-atom (atom 0)
          response-chans-atom (atom {})]
-     {:send-ch (async/chan 1 (comp send-xf
+     {:send-ch (async/chan 100 (comp send-xf
                                    (map (request-buf request-id-seq-atom response-chans-atom))))
-      :read-ch (async/chan 1)
-      :write-ch (async/chan 1)
-      :error-ch (async/chan 1 (map (fn [t] (.printStackTrace t))))
+      :read-ch (async/chan 100)
+      :write-ch (async/chan 100)
+      :error-ch (async/chan 100 (map (fn [t] (.printStackTrace t))))
       :response-chans-atom response-chans-atom
       :request-id-seq-atom request-id-seq-atom})))
 
@@ -189,9 +188,7 @@
     (async/pipe (:write-ch (:conn client)) (:read-ch server-conn))
     (async/pipe (:write-ch server-conn) (:read-ch (:conn client)))
     (go-loop []
-      (println "looping waiting for read-ch")
       (when-let [buf (<! (:read-ch server-conn))]
-        (println "read something from server conn read")
         (handle-read (:request-ch server) server-conn buf)
         (recur)))))
 
@@ -201,7 +198,6 @@
   [request]
   (let [{:keys [conn]} request
         {:keys [write-ch]} conn]
-    (println "writing to ch" write-ch)
     (when-let [buf (response-buf request)]
       (async/put! write-ch buf))
     nil))
